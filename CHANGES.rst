@@ -10,12 +10,18 @@ Changes
 =======
 
 
-Version 0.1.0
+Version 0.1.0 (2022-07-11)
 -------------
 
+- Command Line Interface (CLI).
 
-Released 2020
+- Documentation system based on Sphinx.
 
+- Installation and build instructions.
+
+- Package support through Setuptools.
+
+- Installation and usage instructions.
 
 - Source code versioning based on `Semantic Versioning 2.0.0 <https://semver.org/>`_.
 

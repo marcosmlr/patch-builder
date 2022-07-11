@@ -40,4 +40,6 @@ About
 =====
 
 
-A library in Python to build patches from Collections at Brazil Data Cube Project
+The state-of-the-art models for many image classification tasks are based on Convolutional Neural Networks (CNN). However, to map land use and land cover information based on training a CNN on a hole resolution of satellite images is actually computationally impossible. One way to avoid this is using a subset of images in patch scale, sometimes features observed on image patches can perform better than an image-level classifier.
+
+The patch creator is a python package that provides a simple interface to access satellite images stack from the Brazil Data Cube (BDC) project aiming to permit build a set o patch images to support a large number of applications, including image classification and Content-Based Image Retrieval (CBIR) and captioning using Deep Learning Models.  The BDC project is part of the “Environmental Monitoring of Brazilian Biomes project“, funded by the Amazon Fund through the financial collaboration of the Brazilian Development Bank (BNDES) and the Foundation for Science, Technology and Space Applications (FUNCATE) no. 17.2.0536.1. Brazil Data Cube is the successor of the research project e-sensing, funded by FAPESP (Fapesp 2014/08398-6).
