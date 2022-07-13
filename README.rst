@@ -58,7 +58,7 @@ Below is a quick example on how to use command line interface of ``patch-builder
                            --tiles 081094 \
                            --datetime 2017-01-01/2017-01-31 \
                            --bands red,nir \
-                           --size 128x128from stac import STAC
+                           --size 128x128
 
     
 
