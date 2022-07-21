@@ -8,8 +8,17 @@
 
 """Command line interface for the Patches Creator."""
 import click
+import timeit
 
-from .patch_builder import PatchBuilder
+try:
+    from .patch_builder import PatchBuilder
+except:
+    from patch_builder import PatchBuilder
+    import os
+    os.chdir('..') #goes to the raw path of the package
+
+
+
 
 
 @click.group()
@@ -17,11 +26,6 @@ from .patch_builder import PatchBuilder
 def cli():
     """Patches Creator on command line."""
     pass  # pragma: no cover
-
-
-@cli.command()
-def test():
-    click.secho('Test click2', bold=True, fg='green')
 
 
 @cli.command()
@@ -36,12 +40,28 @@ def test():
                                                                 'nir, B07 or all')
 @click.option('--size', type=click.STRING, required=True, help='Patch size in pixels. For example 128x128.')
 @click.option('--path-output', default='./patch-builder-out/', help='The path to save files.')
-def patch_create(url, access_token, collection_id, tiles, datetime, bands, size, path_output):
+@click.option('--cloud', type=click.BOOL, required=True, help='Boolean condition to create patches without downloading'
+                                                              'assets previously. If False, raster files will be stored'
+                                                              'locally and accelerate new creations of patches from'
+                                                              'these images. This is a trade-off between time and'
+                                                              'storage consume')
+def patch_create(url, access_token, collection_id, tiles, datetime, bands, size, path_output, cloud):
+    start = timeit.default_timer()
     kwargs = {'path_output':path_output}
     pb_object = PatchBuilder(url, collection_id, tiles, datetime, bands, size, access_token=access_token,
                              **kwargs)
+    if cloud:
+        items = pb_object.list_items()
+    else:
+        items = pb_object.download_items()
 
-    #items = pb_object.list_items()
-    items = pb_object.download_items()
     pb_object.patch_items(items)
+    print('Total time elapsed (sec):', timeit.default_timer() - start)
+    print('See results at {} folder!'.format(kwargs['path_output']))
 
+if __name__ == '__main__':
+    # This line is needed to debug the CLI of the package:
+    # patch_create(['--access-token', 'your_token', '--collection-id', \
+    #               'S2-SEN2COR_10_16D_STK-1', '--tiles', '089096','--datetime','2018-12-19/2018-12-31','--bands', \
+    #               'blue', '--size', '128x128', '--cloud', 'False'])
+    pass

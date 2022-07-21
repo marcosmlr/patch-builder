@@ -9,7 +9,7 @@
 Installation
 ============
 
-``patch-builder`` depends essentially on stac.py, json-path and RasterIO. Please, read the instructions below in order to install ``patch-builder``.
+``patch-builder`` depends essentially on stac.py, json-path and GDAL. Please, read the instructions below in order to install ``patch-builder``.
 
 Production installation
 -----------------------
@@ -28,6 +28,17 @@ Use ``git`` to clone the software repository:
 
         $ git clone https://github.com/marcosmlr/patch-builder.git
 
+Ensure you have GDAL installed on the host (``Linux``):
++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+.. code-block:: shell
+
+        $ sudo apt-get update; sudo apt-get install -y libgdal-dev
+
+.. tip::
+
+   For ``Windows`` users, please, consider using the ``OSGEO4W Installer`` to download and install GDAL. Visit http://trac.osgeo.org/osgeo4w, and follow the Quick Start.
+  
 Install patch-builder in Development Mode
 +++++++++++++++++++++++++++++++++++
 
@@ -41,28 +52,24 @@ Install in development mode:
 
 .. code-block:: shell
 
-        $ pip3 install -e .[all]
+        $ pip3 install --editable .[all]
 
 .. note::
 
-    If you want to create a new *Python Virtual Environment*, please, follow this instruction:
-
-    *1.* Create a new virtual environment linked to Python 3.8::
+   If you want to create a new *Python Virtual Environment*, please, follow these instructions:
+   
+   1. Create a new virtual environment linked to Python 3.8::
 
         python3.8 -m venv venv
-
-
-    **2.** Activate the new environment::
+        
+   2. Activate the new environment::
 
         source venv/bin/activate
-
-
-    **3.** Update pip and setuptools::
+   3. Update pip and setuptools::
 
         pip3 install --upgrade pip
 
         pip3 install --upgrade setuptools
-
 
 Run the Tests
 +++++++++++++

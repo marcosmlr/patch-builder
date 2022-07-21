@@ -9,6 +9,7 @@
 """Python Library for Patches Creator."""
 
 import os
+import subprocess
 
 from setuptools import find_packages, setup
 
@@ -48,12 +49,14 @@ setup_requires = [
     'pytest-runner>=5.2',
 ]
 
+pygdal_version = subprocess.run(['gdal-config', '--version'], capture_output=True, text=True).stdout.replace('\n','')+'.*'
+
 install_requires = [
     'Click>=7.0',
     'stac.py>=0.9.0.post6',
     'jsonpath-rw>=1.4',
     'jsonpath-rw-ext>=1.2.2',
-    'rasterio>=1.2.9'
+    'pygdal=='+pygdal_version
 ]
 
 packages = find_packages()

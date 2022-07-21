@@ -8,4 +8,4 @@
 
 """Version information for Python Library for Patches Creator."""
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'

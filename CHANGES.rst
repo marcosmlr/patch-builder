@@ -9,6 +9,19 @@
 Changes
 =======
 
+Version 0.2.0 (2022-07-20)
+-------------
+
+- Command Line Interface (CLI) program adapted for debugging.
+
+- Changed parallel processing with lock (RasterIO) to concurrently processing using GDAL memory file.
+
+- Determine the ideal number of threads based on CPU hardware (limited to 90% of cores).
+
+- Include a command option to CLI to process files from the cloud or locally.
+
+- Include installation instructions for GDAL on Python Virtual Environment.
+
 
 Version 0.1.0 (2022-07-11)
 -------------

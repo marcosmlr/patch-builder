@@ -16,20 +16,21 @@ import jsonpath_rw_ext as jp  # for calling extended methods
 from multiprocessing import cpu_count
 import concurrent.futures
 import threading
-import rasterio
+from osgeo import gdal
+import numpy as np
 import timeit
 from time import sleep
 
-
-num_workers = int(cpu_count() * 2)
+gdal.UseExceptions()  # this allows GDAL to throw Python Exceptions
+num_workers = int(cpu_count() - (cpu_count() * 0.10)) # using about 90% of cores
 
 
 def url_response(url):
     """Download Assets using URL address.
 
-    :param url: Path output to download file and URL for the Asset
-    :type url: tuple
-    """
+       :param url: Path output to download file and URL for the Asset
+       :type url: tuple
+       """
     path_out, url = url
     filename = os.path.join(path_out, urlparse(url)[2].split('/')[-1])
     if not os.path.exists(filename):
@@ -93,8 +94,8 @@ def divide_chunks(l_dimension, n):
         yield l_dimension[i:i + n]
 
 
-def rasterio_windows(totalwidth, totalheight, subwidth, subheight):
-    """Create sequence of RasterIO windows to create patches.
+def patch_windows(totalWidth,totalHeight,subWidth,subHeight):
+    """Create sequence of windows to build patches.
 
        :param totalwidth: Width image size
        :type totalwidth: int
@@ -105,33 +106,82 @@ def rasterio_windows(totalwidth, totalheight, subwidth, subheight):
        :param subheight: Height patch image size
        :type subheight: int
        """
-    w_n = list(divide_chunks(list(range(totalwidth)), subwidth))
-    h_n = list(divide_chunks(list(range(totalheight)), subheight))
-    wins = [rasterio.windows.Window(w[0], h[0], len(w), len(h)) for h in h_n for w in w_n]
+    w_n=list(divide_chunks(list(range(totalWidth)), subWidth))
+    h_n=list(divide_chunks(list(range(totalHeight)), subHeight))
+    wins=[(w[0],h[0],len(w),len(h)) for h in h_n for w in w_n]
     return wins
 
 
-def process(window):
-    """Create patches images using RasterIO with concurrency.
+def pixel_world(geoMatrix, x, y):
+    """Calculate geographic coordinates of a pixel based on the raster projection and NumPy array indices.
 
-       :param window: Path to save image, spatial information of patch, RasterIO dataset reader object, thread lock
-                      and RasterIO window parameters.
-       :type window: tuple
-    """
-    outfile, kwargs, src, read_lock, window = window
+       :param geoMatrix: Object containing affine transformation info for the raster
+       :type geoMatrix: list
+       :param x: Array column index for the upper left corner from the patch image
+       :type x: int
+       :param y: Array row index for the upper left corner from the patch image
+       :type x: int
+
+       Notes
+       -----
+       Uses the GDAL affine transformation (upper_left_x, x_size, x_rotation, upper_left_y, y_rotation and y_size) to
+       calculate the geospatial coordinate of a pixel location. The geomatrix object (gdal.GetGeoTransform()) contains
+       the coordinates (in some projection) of the upper left (UL) corner of the image (taken to be the borders of the
+       pixel in the UL corner, not the center), the pixel spacing and an additional rotation.
+       """
+    x_coord = geoMatrix[0] + (x * geoMatrix[1])
+    y_coord = geoMatrix[3] + (y * geoMatrix[5])
+
+    return x_coord, y_coord
+
+
+#Adapted from https://here.isnew.info/how-to-save-a-numpy-array-as-a-geotiff-file-using-gdal.html
+def write_geotiff(filename, arr, in_ds, w_index_x, w_index_y):
+    """Write a patch image as a projected GeoTIFF file with GDAL based on the NumPy array.
+
+       :param filename: Path to save image.
+       :type filename: str
+       :param arr: Window array values of patch.
+       :type arr: numpy.ndarray
+       :param in_ds: GDAL dataset object contains all information about the original raster (projection,
+                     affine transformation, etc).
+       :type in_ds: osgeo.gdal.Dataset
+       :param w_index_x: Array column index for the upper left corner from the patch image.
+       :type w_index_x: int
+       :param w_index_y: Array row index for the upper left corner from the patch image.
+       :type w_index_y: int
+       """
+    driver = gdal.GetDriverByName("GTiff")
+    out_ds = driver.Create(filename, arr.shape[1], arr.shape[0], 1, in_ds.GetRasterBand(1).DataType)
+    out_ds.SetProjection(in_ds.GetProjection())
+
+    outGeoTransform = list(in_ds.GetGeoTransform())
+    ul_coord_x, ul_coord_y = pixel_world(outGeoTransform, w_index_x, w_index_y)
+    outGeoTransform[0] = ul_coord_x
+    outGeoTransform[3] = ul_coord_y
+    out_ds.SetGeoTransform(in_ds.GetGeoTransform())
+    out_ds.SetGeoTransform(tuple(outGeoTransform))
+    band = out_ds.GetRasterBand(1)
+    band.WriteArray(arr)
+    band.SetNoDataValue(in_ds.GetRasterBand(1).GetNoDataValue())
+    band.FlushCache()
+
+
+def process(window_in):
+    """Create patches images using GDAL with concurrency.
+
+           :param window_in: Path to save image, patch rows, patch collums, nodata value, gdal dataset object
+                             and window index parameters.
+           :type window_in: tuple
+        """
+    outfile, rows_w, cols_w, nodata, in_ds, window = window_in
 
     if not os.path.exists(outfile):
         try:
-            with read_lock:
-                # if no data in window, skip processing the window
-                if not src.read_masks(1, window=window).any():
-                    return
-                src_array = src.read(window=window)
-                win_array = rasterio.windows.Window(0, 0, src_array.shape[2], src_array.shape[1])
-                kwargs.update({'transform': rasterio.windows.transform(window, src.transform)})
-
-            with rasterio.open(outfile, "w", **kwargs) as dest:
-                dest.write(src_array, window=win_array)
+            src_array = np.ones((rows_w, cols_w)) * nodata
+            src_array[0: window[3], 0:window[2]] = in_ds.ReadAsArray(xoff=window[0], yoff=window[1],
+                                                                     xsize=window[2], ysize=window[3])
+            write_geotiff(outfile, src_array, in_ds, window[0], window[1])
         except Exception as e:
             print(e)
 
@@ -139,11 +189,11 @@ def process(window):
 def run_with_retry(func: callable, max_retries: int = 3, wait_seconds: int = 2, **func_params):
     """Execute functions with retry, especially to handle HTTP errors.
 
-       :param func: Function to run
+       :param func: Function to run.
        :type func: function
-       :param max_retries: Number of retryFunction to run
+       :param max_retries: Number of retryFunction to run.
        :type max_retries: int
-       :param wait_seconds: Seconds to wait until the new retry
+       :param wait_seconds: Seconds to wait until the new retry.
        :type func: int
        """
     num_retries = 1
@@ -164,10 +214,11 @@ def run_with_retry(func: callable, max_retries: int = 3, wait_seconds: int = 2, 
 def _url_open(url):
     """Read URL address using urllib.request module.
 
-       :param url: URL for the Asset
+       :param url: URL for the Asset.
        :type url: str
        """
     return urlopen(url).read()
+
 
 class PatchBuilder:
     """Define Patch Builder interface for patches images creation."""
@@ -268,30 +319,39 @@ class PatchBuilder:
             else:
                 tif_bytes = run_with_retry(func=_url_open, param1=url)
 
-            with rasterio.io.MemoryFile(tif_bytes) as memfile:
-                with memfile.open() as src:
-                    # Process the windows concurrently.
-                    prefix, ext = os.path.splitext(os.path.basename(filename))
-                    base_out = os.path.join(target_dir,prefix)
+            try:
+                # Read a bytes stream through a virtual memory file
+                vsipath = '/vsimem/'+os.path.basename(filename)
+                gdal.FileFromMemBuffer(vsipath, tif_bytes)
 
-                    kwargs = src.meta.copy()
-                    kwargs.update({'height': self._hsize,
-                                   'width': self._wsize})
-                    """We cannot write or read to the same file from multiple threads without causing race conditions.
-                        To safely read from multiple threads, we use a lock to protect the DatasetReader/Writer"""
-                    read_lock = threading.Lock()
+                # create Memory driver
+                ds = gdal.GetDriverByName('MEM').CreateCopy(
+                    vsipath,
+                    gdal.Open(vsipath))
 
-                    windows = [(base_out + '_' + str(count) + ext, kwargs, src, read_lock, window)
-                               for count, window in enumerate(rasterio_windows(src.width, src.height, self._wsize,
-                                                                               self._hsize))]
-                    start = timeit.default_timer()
-                    # We map the process() function over the list of windows.
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-                        executor.map(process, windows)
-                    print('Time elapsed (sec):', timeit.default_timer() - start)
+            except RuntimeError as e:
+                ds = None
+                print("Unable to open " + filename)
+                print(e)
 
+            if ds != None:
+                # Process the windows concurrently.
+                prefix, ext = os.path.splitext(os.path.basename(filename))
+                base_out = os.path.join(target_dir, prefix)
 
+                # Get no data value of array
+                noDataValue = ds.GetRasterBand(1).GetNoDataValue()
+                if noDataValue == None:
+                    noDataValue = 0
 
+                windows = [(base_out + '_' + str(count) + ext, self._hsize, self._wsize, noDataValue, ds, window) for count, window
+                           in enumerate(patch_windows(ds.RasterXSize, ds.RasterYSize, self._wsize, self._hsize))]
 
+                start = timeit.default_timer()
+                # We map the process() function over the list of windows.
+                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    executor.map(process, windows)
+                print('Time elapsed for patches creation (sec):', timeit.default_timer() - start)
 
-
+            ds = None
+            gdal.Unlink(vsipath)  # Free memory associated with the in-memory file
