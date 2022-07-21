@@ -58,7 +58,14 @@ Below is a quick example on how to use command line interface of ``patch-builder
                            --tiles 081094 \
                            --datetime 2017-01-01/2017-01-31 \
                            --bands red,nir \
-                           --size 128x128
+                           --size 128x128 \
+                           --cloud False
+                           
+Or ``--help`` for further information about command line options:
+
+.. code-block:: shell
+
+    patch-builder patch-create --help
 
     
 
