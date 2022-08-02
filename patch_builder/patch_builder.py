@@ -343,6 +343,7 @@ class PatchBuilder:
                 noDataValue = ds.GetRasterBand(1).GetNoDataValue()
                 if noDataValue == None:
                     noDataValue = 0
+                    ds.GetRasterBand(1).SetNoDataValue(noDataValue)
 
                 windows = [(base_out + '_' + str(count) + ext, self._hsize, self._wsize, noDataValue, ds, window) for count, window
                            in enumerate(patch_windows(ds.RasterXSize, ds.RasterYSize, self._wsize, self._hsize))]

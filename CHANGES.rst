@@ -9,6 +9,12 @@
 Changes
 =======
 
+Version 0.2.1 (2022-08-02)
+-------------
+
+- Fix bug related to NoDataValue metadata definition at raster files.
+
+
 Version 0.2.0 (2022-07-20)
 -------------
 
